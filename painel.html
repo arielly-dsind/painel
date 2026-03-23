@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard DS - Controle de Projetos</title>
+    <style>
+        :root {
+            --vermelho: #0077b6; 
+            --grafite: #ffffff;   
+            --grafite2: #f4f6f9;  
+            --cinza: #e0e0e0;     
+            --claro: #0f0f0f;     
+            --glass: rgba(0, 0, 0, 0.05); 
+            
+            --sidebar-width: 250px;
+            --verde: #2b9348;
+            --laranja: #f94306;
+            --azul: #00b4d8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--grafite), var(--grafite2));
+            color: var(--claro);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: absolute;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle at 20% 30%, rgba(0, 119, 182, 0.15), transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(0, 119, 182, 0.1), transparent 40%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            width: var(--sidebar-width);
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(0,0,0,0.1);
+            transition: 0.4s;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        #sidebar.collapsed { margin-left: calc(-1 * var(--sidebar-width)); }
+        .logo-ds { font-size: 2rem; font-weight: bold; color: var(--vermelho); margin-bottom: 40px; }
+        .menu-btn {
+            background: none; border: none; color: var(--claro); text-align: left;
+            padding: 15px; font-size: 1rem; cursor: pointer; border-radius: 8px;
+            transition: 0.3s; margin-bottom: 10px;
+        }
+        .menu-btn:hover { background: rgba(0, 119, 182, 0.1); color: var(--vermelho); }
+
+        /* --- MAIN --- */
+        main { flex-grow: 1; display: flex; flex-direction: column; z-index: 5; position: relative; overflow-y: auto; scroll-behavior: smooth; }
+        header { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #eee; }
+        
+        #view-title { 
+            color: var(--vermelho); 
+            margin: 0; 
+            font-size: 1.5rem; 
+            text-align: center; 
+            flex-grow: 1;
+            font-weight: bold;
+        }
+
+        .top-btn {
+            padding: 8px 15px; border-radius: 5px; border: none;
+            background: var(--vermelho); color: white; cursor: pointer;
+            text-decoration: none; font-weight: bold; font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .andon-btn {
+            background: #ffaa00;
+            color: #000;
+            border: 2px solid #cc8800;
+            padding: 8px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-left: 15px;
+        }
+        .andon-active { background: #d00000; color: #fff; border-color: #800000; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        /* --- KPIs --- */
+        .kpi-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            border-top: 3px solid var(--vermelho);
+            text-align: center;
+            min-width: 150px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .kpi-value { font-size: 1.4rem; font-weight: bold; display: block; color: var(--claro); }
+        .kpi-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+
+        .kpi-inline {
+            background: #f0f4f8;
+            padding: 5px 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 3px solid var(--azul);
+            min-width: 100px;
+        }
+        .kpi-inline .val { font-size: 1.2rem; font-weight: bold; display: block; color: var(--vermelho); }
+        .kpi-inline .lab { font-size: 0.6rem; color: #666; text-transform: uppercase; }
+
+        /* --- GRID E CARDS --- */
+        .content-area { padding: 20px 40px; }
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.5s; }
+
+        .data-input-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .config-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--vermelho);
+        }
+        .config-box h3 { margin-top: 0; color: var(--vermelho); font-size: 1rem; }
+
+        textarea {
+            width: 100%; height: 300px; background: #f9f9f9; border: 1px solid #ddd;
+            border-radius: 5px; color: #333; padding: 10px; font-family: monospace;
+            resize: none; box-sizing: border-box; margin-bottom: 10px;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .card-projeto {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #eee;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .img-container { width: 100%; height: 140px; background: #f9f9f9; border-radius: 8px; margin-bottom: 15px; overflow: hidden; border: 1px solid #eee; }
+        .img-container img { width: 100%; height: 100%; object-fit: contain; }
+        
+        .projeto-titulo { font-size: 1rem; font-weight: bold; margin-bottom: 10px; min-height: 45px; color: var(--claro); }
+        .progress-bar-bg { width: 100%; height: 10px; background: #eee; border-radius: 10px; margin: 12px 0; overflow: hidden; }
+        .progress-fill { height: 100%; transition: 0.5s; }
+
+        .encerrados-layout {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
+
+        .lista-lateral-encerrados {
+            flex: 0 0 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 75vh;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .mini-card-encerrado {
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 5px solid var(--verde);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard-central {
+            background: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .pie-chart-container {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            margin: 15px 0;
+            background: conic-gradient(var(--verde) 0% 0%, var(--laranja) 0% 100%);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        /* --- TOOLTIP STYLE --- */
+        .tooltip-custom {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+            text-align: left;
+            min-width: 180px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .tooltip-custom b { color: #f94306; display: block; margin-bottom: 5px; border-bottom: 1px solid #555; }
+
+        .pie-chart-inner {
+            width: 120px;
+            height: 120px;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- GAUGE REFORMATADO --- */
+        .gauge-wrap {
+            width: 140px;
+            height: 70px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        .gauge-body {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            position: absolute;
+            top: 0; left: 0;
+            box-sizing: border-box;
+            border: 15px solid #eee;
+        }
+        .gauge-fill {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            position: absolute;
+            top: 0; left: 0;
+            box-sizing: border-box;
+            border: 15px solid var(--vermelho);
+            border-bottom-color: transparent !important;
+            border-left-color: transparent !important;
+            transform: rotate(-45deg);
+            transition: transform 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .gauge-val-txt {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        .gauge-label-bottom { font-size: 0.7rem; color: #444; font-weight: 800; text-transform: uppercase; margin-top: 5px; }
+
+        .legend-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
+    </style>
+</head>
+<body>
+
+    <nav id="sidebar">
+        <div class="logo-ds">DS</div>
+        <button class="menu-btn" onclick="showView('andamento')">🚀 Projetos em Andamento</button>
+        <button class="menu-btn" onclick="showView('encerrados')">✅ Projetos Encerrados</button>
+        <button class="menu-btn" onclick="showView('config')" style="margin-top: auto; border-top: 1px solid var(--cinza);">⚙️ Configurações</button>
+    </nav>
+
+    <main id="main-content">
+        <header>
+            <div style="display: flex; align-items: center;">
+                <span style="cursor:pointer; color:var(--vermelho); font-size:1.5rem;" onclick="toggleSidebar()">☰</span>
+                <button id="btn-andon" class="andon-btn" onclick="toggleAndonMode()">ANDON</button>
+            </div>
+            <h2 id="view-title">PAINEL DE PROJETOS</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div id="kpi-ativos-header" class="kpi-inline" style="display: none;">
+                    <span class="val" id="and-total">0</span>
+                    <span class="lab">Projetos Ativos</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div id="placeholder" style="color:rgba(0,0,0,0.2); text-align: center; margin-top: 100px;">
+                Selecione uma opção no menu lateral.
+            </div>
+
+            <section id="view-andamento" class="view-section">
+                <div id="grid-andamento" class="results-grid"></div>
+            </section>
+
+            <section id="view-encerrados" class="view-section">
+                <div id="tooltip-status" class="tooltip-custom"></div>
+
+                <div class="encerrados-layout">
+                    <div id="grid-encerrados-lista" class="lista-lateral-encerrados">
+                        <p style="color:#aaa; text-align:center;">Aguardando dados...</p>
+                    </div>
+
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                        
+                        <div style="display: flex; gap: 20px; align-items: stretch;">
+                            <div class="dashboard-central" style="flex: 1; border-top: 4px solid purple;">
+                                <h3 style="font-size: 1.0rem; color: #555; margin: 0;">TIPO DE MERCADO</h3>
+                                <div id="pie-tipo-projeto" class="pie-chart-container" style="width: 170px; height: 170px;"></div>
+                                <div id="legenda-tipos" style="font-size: 0.95rem; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;"></div>
+                            </div>
+
+                            <div class="dashboard-central" style="flex: 1; border-top: 4px solid red;">
+                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                    <div class="kpi-card" style="padding: 10px; min-width: 90px; border-top-color: #333;">
+                                        <span class="kpi-label" style="font-size:0.6rem;">Total</span>
+                                        <span class="kpi-value" id="enc-total" style="font-size: 1.2rem;">0</span>
+                                    </div>
+                                    <div class="kpi-card" style="padding: 10px; min-width: 90px; border-top-color: var(--azul);">
+                                        <span class="kpi-label" style="font-size:0.6rem;">Média</span>
+                                        <span class="kpi-value" id="enc-media" style="font-size: 1.2rem;">0.0</span>
+                                    </div>
+                                </div>
+                                <div id="pie-chart" class="pie-chart-container" style="width: 150px; height: 150px; margin: 5px 0;" onmousemove="showStatusTooltip(event)" onmouseleave="hideStatusTooltip()">
+                                    <div class="pie-chart-inner" style="width: 90px; height: 90px;">
+                                        <span id="txt-perc-geral" style="font-size: 1.4rem; font-weight: bold; color: var(--verde);">0%</span>
+                                    </div>
+                                </div>
+                                <div class="legend-container" style="font-size: 0.95rem;">
+                                    <div style="color: var(--verde);">● Entregues no Prazo: (<span id="txt-perc-prazo">0</span>%)</div>
+                                    <div style="color: var(--laranja);">● Com Atrasos: (<span id="txt-perc-atraso">0</span>%)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 20px;">
+                            <div class="dashboard-central" style="flex: 1; border-top: 4px solid #f94306;">
+                                <div class="gauge-wrap">
+                                    <div class="gauge-body"></div>
+                                    <div id="gauge-dia-fill" class="gauge-fill" style="border-color: #f94306;"></div>
+                                    <div id="gauge-dia-val" class="gauge-val-txt">0.0</div>
+                                </div>
+                                <div class="gauge-label-bottom">Diária</div>
+                            </div>
+                            <div class="dashboard-central" style="flex: 1; border-top: 4px solid purple;">
+                                <div class="gauge-wrap">
+                                    <div class="gauge-body"></div>
+                                    <div id="gauge-mes-fill" class="gauge-fill" style="border-color: purple;"></div>
+                                    <div id="gauge-mes-val" class="gauge-val-txt">0.0</div>
+                                </div>
+                                <div class="gauge-label-bottom">Mensal</div>
+                            </div>
+                            <div class="dashboard-central" style="flex: 1; border-top: 4px solid #ff00ff;">
+                                <div class="gauge-wrap">
+                                    <div class="gauge-body"></div>
+                                    <div id="gauge-ano-fill" class="gauge-fill" style="border-color: #ff00ff;"></div>
+                                    <div id="gauge-ano-val" class="gauge-val-txt">0.0</div>
+                                </div>
+                                <div class="gauge-label-bottom">Anual</div>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-central" style="border-top: 4px solid green; padding: 15px 25px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 8px;">
+                                <span style="font-weight: bold; color: var(--verde); font-size: 0.9rem;">PROGRESSO - META SEMESTRAL</span>
+                                <span id="txt-progresso-meta" style="font-weight: bold; font-size: 0.9rem;">0 / 102</span>
+                            </div>
+                            <div class="progress-bar-bg" style="height: 25px; background: #eee; border-radius: 20px; width: 100%; margin: 0;">
+                                <div id="bar-meta-fill" class="progress-fill" style="width: 0%; background: linear-gradient(90deg, #2b9348, #55a630); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.8rem;">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-config" class="view-section">
+                <div class="data-input-container">
+                    <div class="config-box">
+                        <h3>📋 Dados: Em Andamento</h3>
+                        <textarea id="input-andamento" placeholder="Cole os dados de Projetos em Andamento aqui..."></textarea>
+                    </div>
+                    <div class="config-box">
+                        <h3>📋 Dados: Encerrados</h3>
+                        <textarea id="input-encerrados" placeholder="Cole as 13 colunas de Projetos Encerrados aqui..."></textarea>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="top-btn" style="padding: 15px 40px; font-size: 1rem;" onclick="salvarEPontuar()">SALVAR E ATUALIZAR DASHBOARD</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        let andonInterval = null;
+        let currentView = 'andamento';
+        let projetosAtrasadosCache = []; // Para o tooltip
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+
+        function toggleFullScreen(force) {
+            if (force === true || !document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (force === false) {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        function showView(id) {
+            document.getElementById('placeholder').style.display = 'none';
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('view-' + id).classList.add('active');
+            
+            const kpiAtivos = document.getElementById('kpi-ativos-header');
+            if(kpiAtivos) kpiAtivos.style.display = (id === 'andamento') ? 'block' : 'none';
+
+            const titles = {
+                'andamento': 'PROJETOS EM ANDAMENTO',
+                'encerrados': 'PROJETOS ENCERRADOS',
+                'config': 'ENTRADA DE DADOS'
+            };
+            document.getElementById('view-title').innerText = titles[id] || "";
+            currentView = id;
+            document.getElementById('main-content').scrollTop = 0;
+        }
+
+        async function toggleAndonMode() {
+            const btn = document.getElementById('btn-andon');
+            if (andonInterval) {
+                clearTimeout(andonInterval); 
+                andonInterval = null;
+                btn.classList.remove('andon-active');
+                toggleFullScreen(false);
+                document.getElementById('sidebar').classList.remove('collapsed');
+                return;
+            }
+
+            toggleFullScreen(true);
+            document.getElementById('sidebar').classList.add('collapsed');
+            btn.classList.add('andon-active');
+            
+            runAndonCycle(); 
+        }
+
+        async function runAndonCycle() {
+            if (!document.getElementById('btn-andon').classList.contains('andon-active')) return;
+
+            showView('andamento');
+            const main = document.getElementById('main-content');
+            main.scrollTop = 0;
+
+            await new Promise(r => setTimeout(r, 3000));
+            await autoScrollAndamento();
+            await new Promise(r => setTimeout(r, 5000));
+
+            showView('encerrados');
+            andonInterval = setTimeout(runAndonCycle, 15000);
+        }
+
+        function autoScrollAndamento() {
+            return new Promise((resolve) => {
+                const main = document.getElementById('main-content');
+                const scrollHeight = main.scrollHeight - main.clientHeight;
+                if (scrollHeight <= 0) return resolve();
+                const speed = 0.05; 
+                let currentPos = 0;
+
+                function step() {
+                    if (!document.getElementById('btn-andon').classList.contains('andon-active') || currentView !== 'andamento') {
+                        return resolve();
+                    }
+                    currentPos += speed * 15; 
+                    main.scrollTop = currentPos;
+                    if (currentPos < scrollHeight) {
+                        requestAnimationFrame(step);
+                    } else {
+                        resolve(); 
+                    }
+                }
+                requestAnimationFrame(step);
+            });
+        }
+
+        function parseData(dateStr) {
+            if (!dateStr || dateStr.trim() === "") return null;
+            const parts = dateStr.split('/');
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+
+        function updateGauge(fillId, valId, value, maxVal) {
+            const perc = Math.min((value / maxVal) * 100, 100);
+            const rotation = (perc * 1.8) - 45; 
+            document.getElementById(fillId).style.transform = `rotate(${rotation}deg)`;
+            document.getElementById(valId).innerText = value.toFixed(1);
+        }
+
+        function showStatusTooltip(e) {
+            if (projetosAtrasadosCache.length === 0) return;
+            const tt = document.getElementById('tooltip-status');
+            tt.style.display = 'block';
+            tt.style.left = (e.pageX + 15) + 'px';
+            tt.style.top = (e.pageY + 15) + 'px';
+            
+            let html = `<b>MOTIVOS DE ATRASO:</b>`;
+            projetosAtrasadosCache.slice(0, 3).forEach(p => {
+                html += `<div style="margin-bottom:4px">• ${p}</div>`;
+            });
+            if (projetosAtrasadosCache.length > 3) html += `<div style="font-size:0.6rem; color:#aaa">+ ${projetosAtrasadosCache.length - 3} outros projetos...</div>`;
+            tt.innerHTML = html;
+        }
+
+        function hideStatusTooltip() {
+            document.getElementById('tooltip-status').style.display = 'none';
+        }
+
+        function salvarEPontuar() {
+            const andData = document.getElementById('input-andamento').value;
+            const encData = document.getElementById('input-encerrados').value;
+            localStorage.setItem('dados_andamento', andData);
+            localStorage.setItem('dados_encerrados', encData);
+            processarAndamento();
+            processarEncerrados();
+            alert("Dados atualizados com sucesso!");
+        }
+
+        window.onload = function() {
+            const andData = localStorage.getItem('dados_andamento');
+            const encData = localStorage.getItem('dados_encerrados');
+            if(andData) { document.getElementById('input-andamento').value = andData; processarAndamento(); }
+            if(encData) { document.getElementById('input-encerrados').value = encData; processarEncerrados(); }
+        };
+
+        function processarAndamento() {
+            const raw = document.getElementById('input-andamento').value;
+            const grid = document.getElementById('grid-andamento');
+            grid.innerHTML = "";
+            if(!raw.trim()) return;
+            const linhas = raw.split('\n');
+            let listaProjetos = [];
+            linhas.forEach(linha => {
+                const col = linha.split('\t');
+                if(col.length >= 5) {
+                    const titulo = col[3].trim(); 
+                    const dataEst = parseData(col[2]);
+                    const responsavel = col[11] || "N/A";
+                    let perc = parseFloat(col[4].replace('%', '').replace(',', '.')) || 0;
+                    if(perc > 100) perc = 100;
+                    const regexCodigo = /^([^\s-]+)/;
+                    const match = titulo.match(regexCodigo);
+                    const codigoImagem = match ? match[1].replace(/\//g, '-') : 'default';
+                    listaProjetos.push({ titulo, dataEst, responsavel, perc, codigoImagem });
+                }
+            });
+            listaProjetos.sort((a, b) => (a.dataEst || 0) - (b.dataEst || 0));
+            listaProjetos.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'card-projeto';
+                card.innerHTML = `<div class="img-container"><img src="img/projetos/${p.codigoImagem}.png" onerror="this.src='https://via.placeholder.com/200/f9f9f9/0077b6?text=DS'"></div><div class="projeto-titulo">${p.titulo}</div><div style="font-size: 0.85rem; color: #555;">Responsável: <b>${p.responsavel}</b></div><div style="font-size: 0.8rem; color: #888; margin-top:4px;">Prazo: ${p.dataEst ? p.dataEst.toLocaleDateString('pt-BR') : '--/--/--'}</div><div class="progress-bar-bg"><div class="progress-fill" style="width: ${p.perc}%; background: var(--azul);"></div></div><div style="font-size: 0.85rem; color: var(--azul); font-weight: bold;">${p.perc}% Concluído</div>`;
+                grid.appendChild(card);
+            });
+            document.getElementById('and-total').innerText = listaProjetos.length;
+        }
+
+        function processarEncerrados() {
+            const raw = document.getElementById('input-encerrados').value;
+            const listaHtml = document.getElementById('grid-encerrados-lista');
+            const pieChartStatus = document.getElementById('pie-chart');
+            const pieChartTipo = document.getElementById('pie-tipo-projeto');
+            const legendaTipos = document.getElementById('legenda-tipos');
+            listaHtml.innerHTML = ""; legendaTipos.innerHTML = "";
+            projetosAtrasadosCache = []; // Limpa cache
+            
+            if(!raw.trim()) return;
+            const linhas = raw.split('\n');
+            let total = 0, noPrazo = 0, datasTermino = [], contagemTipos = {};
+            linhas.forEach(linha => {
+                const col = linha.split('\t');
+                if(col.length >= 11) {
+                    total++;
+                    const titulo = col[0];
+                    const estTermino = parseData(col[2]);
+                    const realTermino = parseData(col[3]);
+                    const responsavel = col[12] || "N/A";
+                    const tipoProjeto = col[10] || "Outros"; 
+                    contagemTipos[tipoProjeto] = (contagemTipos[tipoProjeto] || 0) + 1;
+                    if(realTermino) datasTermino.push(realTermino);
+                    
+                    let corStatus = (estTermino && realTermino && realTermino > estTermino) ? "var(--laranja)" : "var(--verde)";
+                    if (corStatus === "var(--verde)") {
+                        noPrazo++;
+                    } else {
+                        projetosAtrasadosCache.push(titulo);
+                    }
+                    
+                    const miniCard = document.createElement('div');
+                    miniCard.className = 'mini-card-encerrado';
+                    miniCard.style.borderLeftColor = corStatus;
+                    miniCard.innerHTML = `<div style="max-width:280px"><strong>${titulo}</strong><br><span style="font-size:0.7rem; color:#888;">${responsavel}</span></div><span style="color:${corStatus}; font-weight:bold;">●</span>`;
+                    listaHtml.appendChild(miniCard);
+                }
+            });
+            if(total > 0 && datasTermino.length > 0) {
+                const minData = new Date(Math.min(...datasTermino)), maxData = new Date(Math.max(...datasTermino));
+                const meses = (maxData.getFullYear() - minData.getFullYear()) * 12 + (maxData.getMonth() - minData.getMonth()) + 1;
+                document.getElementById('enc-media').innerText = (total / (meses || 1)).toFixed(1);
+                updateGauge('gauge-dia-fill', 'gauge-dia-val', total/30, 1.5);
+                updateGauge('gauge-mes-fill', 'gauge-mes-val', total/meses, 30);
+                updateGauge('gauge-ano-fill', 'gauge-ano-val', total, 300);
+            }
+            const percPrazo = total > 0 ? (noPrazo / total) * 100 : 0;
+            document.getElementById('enc-total').innerText = total;
+            document.getElementById('txt-perc-prazo').innerText = Math.round(percPrazo);
+            document.getElementById('txt-perc-atraso').innerText = Math.round(100 - percPrazo);
+            document.getElementById('txt-perc-geral').innerText = Math.round(percPrazo) + "%";
+            pieChartStatus.style.background = `conic-gradient(var(--verde) 0% ${percPrazo}%, var(--laranja) ${percPrazo}% 100%)`;
+            
+            let coresTipos = ["#0077b6", "#00b4d8", "#90e0ef", "#2b9348", "#ff9f1c", "#e71d36", "#a2d2ff"];
+            let pizzaGradient = [], acumulado = 0, i = 0;
+            for (let tipo in contagemTipos) {
+                let p = (contagemTipos[tipo] / total) * 100, cor = coresTipos[i % coresTipos.length];
+                pizzaGradient.push(`${cor} ${acumulado}% ${acumulado + p}%`);
+                acumulado += p;
+                legendaTipos.innerHTML += `<div><span style="color:${cor}">●</span> ${tipo} (${Math.round(p)}%)</div>`;
+                i++;
+            }
+            pieChartTipo.style.background = `conic-gradient(${pizzaGradient.join(", ")})`;
+            const meta = 102; let percMeta = (total / meta) * 100;
+            document.getElementById('bar-meta-fill').style.width = Math.min(percMeta, 100) + "%";
+            document.getElementById('txt-progresso-meta').innerText = `${total} / ${meta}`;
+        }
+    </script>
+</body>
+</html>
